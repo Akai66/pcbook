@@ -1,0 +1,15 @@
+syntax="proto3";
+
+option go_package="./pb";
+
+//键盘
+message Keyborad{
+  enum Layout{
+    UNKNOWN = 0;
+    QWERTY = 1;
+    QWERTZ = 2;
+    AZERTY = 3;
+  }
+  Layout layout = 1;//布局
+  bool backlit = 2;//是否背光
+}

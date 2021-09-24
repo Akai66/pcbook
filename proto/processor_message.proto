@@ -1,0 +1,24 @@
+syntax="proto3";
+
+option go_package="./pb";
+
+import "memory_message.proto";
+
+//中央处理器
+message CPU{
+  string brand=1;
+  string name=2;
+  uint32 number_cores=3;
+  uint32 number_threads=4;
+  double min_ghz=5;
+  double max_ghz=6;
+}
+
+//图形处理器
+message GPU{
+  string brand=1;
+  string name=2;
+  double min_ghz=3;
+  double max_ghz=4;
+  Memory memory=5;
+}
