@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 	"log"
 	"pcbook/pb"
+	"time"
 )
 
 type LaptopServer struct {
@@ -36,6 +37,20 @@ func (server *LaptopServer) CreateLaptop(ctx context.Context, req *pb.CreateLapt
 			return nil, status.Errorf(codes.Internal, "cannot generate a new laptop ID: %v", err)
 		}
 		laptop.Id = id.String()
+	}
+
+	//some heavy processing
+	time.Sleep(6 * time.Second)
+
+	//判断context错误，及时停止执行，否则服务端依然会继续执行保存操作
+	if ctx.Err() == context.Canceled {
+		//客户端手动取消ctrl+c，服务端停止执行
+		return nil, status.Errorf(codes.Canceled, "request is canceled")
+	}
+
+	if ctx.Err() == context.DeadlineExceeded {
+		//超时，服务端停止执行
+		return nil, status.Errorf(codes.DeadlineExceeded, "deadline is exceeded")
 	}
 
 	//将laptop保存到内存字典中,此处使用map代替数据库
