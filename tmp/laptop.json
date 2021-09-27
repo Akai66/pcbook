@@ -1,27 +1,27 @@
 {
-  "id": "bacb74f9-5e24-46a9-b306-0aa54f432253",
-  "brand": "Apple",
-  "name": "Macbook Air",
+  "id": "abd39440-fcfe-4aa5-bd7d-c32d0db8979f",
+  "brand": "Dell",
+  "name": "Vostro",
   "cpu": {
     "brand": "Intel",
-    "name": "Core i7-9750H",
-    "number_cores": 3,
-    "number_threads": 5,
-    "min_ghz": 2.1497332307469463,
-    "max_ghz": 4.929869960321641
+    "name": "Core i9-9980HK",
+    "number_cores": 2,
+    "number_threads": 6,
+    "min_ghz": 2.364727896774723,
+    "max_ghz": 4.3095971181498465
   },
   "ram": {
-    "value": "41",
+    "value": "23",
     "unit": "GIGABYTE"
   },
   "gpus": [
     {
       "brand": "AMD",
-      "name": "RX 590",
-      "min_ghz": 1.0934996878088412,
-      "max_ghz": 1.33675368114168,
+      "name": "RX 580",
+      "min_ghz": 1.4919598789845194,
+      "max_ghz": 1.9989379495118627,
       "memory": {
-        "value": "4",
+        "value": "2",
         "unit": "GIGABYTE"
       }
     }
@@ -30,7 +30,7 @@
     {
       "driver": "SSD",
       "memory": {
-        "value": "296",
+        "value": "976",
         "unit": "GIGABYTE"
       }
     },
@@ -43,20 +43,20 @@
     }
   ],
   "screen": {
-    "size_inch": 14.782142,
+    "size_inch": 13.514626,
     "resolution": {
-      "width": 3683,
-      "height": 2072
+      "width": 6005,
+      "height": 3378
     },
     "panel": "OLED",
     "multitouch": true
   },
   "keyborad": {
-    "layout": "QWERTY",
-    "backlit": true
+    "layout": "QWERTZ",
+    "backlit": false
   },
-  "weight_kg": 2.0594798774042022,
-  "price_used": 2403.9641373634186,
-  "release_year": 2018,
-  "update_at": "2021-09-27T03:51:59.684110Z"
+  "weight_kg": 1.773349637457636,
+  "price_used": 2256.4915450262447,
+  "release_year": 2017,
+  "update_at": "2021-09-27T12:51:18.141064Z"
 }
