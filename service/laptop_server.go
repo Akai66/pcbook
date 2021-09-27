@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc/status"
 	"log"
 	"pcbook/pb"
-	"time"
 )
 
 type LaptopServer struct {
@@ -40,7 +39,7 @@ func (server *LaptopServer) CreateLaptop(ctx context.Context, req *pb.CreateLapt
 	}
 
 	//some heavy processing
-	time.Sleep(6 * time.Second)
+	//time.Sleep(6 * time.Second)
 
 	//判断context错误，及时停止执行，否则服务端依然会继续执行保存操作
 	if ctx.Err() == context.Canceled {
@@ -71,4 +70,28 @@ func (server *LaptopServer) CreateLaptop(ctx context.Context, req *pb.CreateLapt
 	}
 	return res, nil
 
+}
+
+func (server *LaptopServer) SearchLaptop(req *pb.SearchLaptopRequest, stream pb.LaptopService_SearchLaptopServer) error {
+	filter := req.GetFilter()
+	log.Printf("receive a search-laptop request with filter: %v", filter)
+
+	ctx := stream.Context()
+	err := server.Store.Search(ctx, filter, func(laptop *pb.Laptop) error {
+		res := &pb.SearchLaptopResponse{
+			Laptop: laptop,
+		}
+		err := stream.Send(res)
+		if err != nil {
+			return err
+		}
+		log.Printf("send laptop with id: %s", laptop.GetId())
+		return nil
+	})
+
+	if err != nil {
+		return status.Errorf(codes.Internal, "unexpected error: %v", err)
+	}
+
+	return nil
 }
