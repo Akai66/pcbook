@@ -12,7 +12,10 @@ var ErrAlreadyExists = errors.New("record already exists")
 
 //LaptopStore 笔记本存储器接口
 type LaptopStore interface {
+	//Save 保存数据
 	Save(laptop *pb.Laptop) error
+	//Find 根据id查找laptop
+	Find(id string) (*pb.Laptop, error)
 }
 
 //InMemoryLaptopStore 内存存储器，使用map存储
@@ -44,4 +47,23 @@ func (store *InMemoryLaptopStore) Save(laptop *pb.Laptop) error {
 	}
 	store.data[other.Id] = other
 	return nil
+}
+
+func (store *InMemoryLaptopStore) Find(id string) (*pb.Laptop, error) {
+	//加读锁
+	store.mutex.RLock()
+	defer store.mutex.RUnlock()
+
+	laptop := store.data[id]
+	if laptop == nil {
+		return nil, nil
+	}
+
+	//此处同上，也是为了防止map中value的内容被外部修改，需要进行深拷贝
+	other := &pb.Laptop{}
+	err := copier.Copy(other, laptop)
+	if err != nil {
+		return nil, fmt.Errorf("cannot copy laptop data:%w", err)
+	}
+	return other, nil
 }

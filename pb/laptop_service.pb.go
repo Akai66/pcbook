@@ -246,7 +246,7 @@ func NewLaptopServiceClient(cc grpc.ClientConnInterface) LaptopServiceClient {
 
 func (c *laptopServiceClient) CreateLaptop(ctx context.Context, in *CreateLaptopRequest, opts ...grpc.CallOption) (*CreateLaptopResponse, error) {
 	out := new(CreateLaptopResponse)
-	err := c.cc.Invoke(ctx, "/LaptopSerCreateLaptopRequestvice/CreateLaptop", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/LaptopService/CreateLaptop", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
