@@ -15,16 +15,40 @@ message CreateLaptopResponse{
     string id=1;
 }
 
+//搜索笔记本的请求
 message SearchLaptopRequest{
     Filter filter = 1;
 }
 
+//搜索笔记本的响应
 message SearchLaptopResponse{
     Laptop laptop = 1;
 }
+
+//上传图片的请求
+message UploadImageRequest{
+  oneof data {
+    ImageInfo info = 1;
+    bytes chunk_data = 2;
+  }
+}
+
+//图片信息
+message ImageInfo {
+  string laptop_id = 1; //笔记本id
+  string image_type = 2; //图片类型:.jgp/.png等
+}
+
+//上传图片的响应
+message UploadImageResponse{
+  string id = 1; //服务器生成的图片id
+  uint32 size = 2; //图片大小
+}
+
 
 
 service LaptopService{
   rpc CreateLaptop(CreateLaptopRequest) returns (CreateLaptopResponse) {};
   rpc SearchLaptop(SearchLaptopRequest) returns (stream SearchLaptopResponse) {};
+  rpc UploadImage(stream UploadImageRequest) returns (UploadImageResponse) {};
 }

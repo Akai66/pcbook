@@ -8,7 +8,6 @@ import (
 	"log"
 	"pcbook/pb"
 	"sync"
-	"time"
 )
 
 var ErrAlreadyExists = errors.New("record already exists")
@@ -76,7 +75,7 @@ func (store *InMemoryLaptopStore) Search(ctx context.Context, filter *pb.Filter,
 	//遍历筛选符合条件的laptop
 	for _, laptop := range store.data {
 		//heavy processing
-		time.Sleep(1 * time.Second)
+		//time.Sleep(1 * time.Second)
 		log.Printf("checking laptop id: %s", laptop.GetId())
 		//如果超时或客户端ctrl+c,则结束循环,避免浪费服务器资源
 		if ctx.Err() == context.DeadlineExceeded || ctx.Err() == context.Canceled {

@@ -1,27 +1,27 @@
 {
-  "id": "abd39440-fcfe-4aa5-bd7d-c32d0db8979f",
+  "id": "63a3e2d8-1e32-43cc-bccd-f8fffb39ddf9",
   "brand": "Dell",
-  "name": "Vostro",
+  "name": "XPS",
   "cpu": {
     "brand": "Intel",
-    "name": "Core i9-9980HK",
+    "name": "Xeon E-2286M",
     "number_cores": 2,
-    "number_threads": 6,
-    "min_ghz": 2.364727896774723,
-    "max_ghz": 4.3095971181498465
+    "number_threads": 4,
+    "min_ghz": 2.492583971307263,
+    "max_ghz": 3.4621795416371755
   },
   "ram": {
-    "value": "23",
+    "value": "6",
     "unit": "GIGABYTE"
   },
   "gpus": [
     {
-      "brand": "AMD",
-      "name": "RX 580",
-      "min_ghz": 1.4919598789845194,
-      "max_ghz": 1.9989379495118627,
+      "brand": "NVIDIA",
+      "name": "RTX 2070",
+      "min_ghz": 1.293670386098023,
+      "max_ghz": 1.662747728544973,
       "memory": {
-        "value": "2",
+        "value": "6",
         "unit": "GIGABYTE"
       }
     }
@@ -30,33 +30,33 @@
     {
       "driver": "SSD",
       "memory": {
-        "value": "976",
+        "value": "889",
         "unit": "GIGABYTE"
       }
     },
     {
       "driver": "HDD",
       "memory": {
-        "value": "1",
+        "value": "3",
         "unit": "TERABYTE"
       }
     }
   ],
   "screen": {
-    "size_inch": 13.514626,
+    "size_inch": 16.734634,
     "resolution": {
-      "width": 6005,
-      "height": 3378
+      "width": 5850,
+      "height": 3291
     },
-    "panel": "OLED",
-    "multitouch": true
+    "panel": "IPS",
+    "multitouch": false
   },
   "keyborad": {
     "layout": "QWERTZ",
-    "backlit": false
+    "backlit": true
   },
-  "weight_kg": 1.773349637457636,
-  "price_used": 2256.4915450262447,
-  "release_year": 2017,
-  "update_at": "2021-09-27T12:51:18.141064Z"
+  "weight_kg": 2.673937744586465,
+  "price_used": 2585.5239272957688,
+  "release_year": 2018,
+  "update_at": "2021-09-28T10:48:34.360058Z"
 }

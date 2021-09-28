@@ -1,12 +1,16 @@
 package service
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"pcbook/pb"
 	"pcbook/sample"
 	"pcbook/serializer"
@@ -16,7 +20,8 @@ import (
 func TestLaptopClient_CreateLaptop(t *testing.T) {
 	t.Parallel()
 
-	laptopServer, serverAddr := startTestLaptopServer(t, NewInMemoryLaptopStore())
+	laptopStore := NewInMemoryLaptopStore()
+	serverAddr := startTestLaptopServer(t, laptopStore, nil)
 	laptopClient := newTestLaptopClient(t, serverAddr)
 
 	laptop := sample.NewLaptop()
@@ -25,7 +30,7 @@ func TestLaptopClient_CreateLaptop(t *testing.T) {
 		Laptop: laptop,
 	}
 
-	other, err := laptopServer.Store.Find(expectedID)
+	other, err := laptopStore.Find(expectedID)
 	require.NoError(t, err)
 	require.Nil(t, other)
 
@@ -35,7 +40,7 @@ func TestLaptopClient_CreateLaptop(t *testing.T) {
 	require.Equal(t, expectedID, res.Id)
 
 	//验证是否确实已经保存到存储器
-	other, err = laptopServer.Store.Find(res.Id)
+	other, err = laptopStore.Find(res.Id)
 	require.NoError(t, err)
 	require.NotNil(t, other)
 
@@ -52,7 +57,7 @@ func TestLaptopClient_SearchLaptop(t *testing.T) {
 		MinCpuGhz:    2.5,
 		MinRam:       &pb.Memory{Value: 8, Unit: pb.Memory_GIGABYTE},
 	}
-	store := NewInMemoryLaptopStore()
+	laptopStore := NewInMemoryLaptopStore()
 	expectedIDs := make(map[string]bool)
 
 	for i := 0; i < 6; i++ {
@@ -79,11 +84,11 @@ func TestLaptopClient_SearchLaptop(t *testing.T) {
 			laptop.Ram = &pb.Memory{Value: 10, Unit: pb.Memory_GIGABYTE}
 			expectedIDs[laptop.Id] = true
 		}
-		err := store.Save(laptop)
+		err := laptopStore.Save(laptop)
 		require.NoError(t, err)
 	}
 
-	_, serverAddr := startTestLaptopServer(t, store)
+	serverAddr := startTestLaptopServer(t, laptopStore, nil)
 	laptopClient := newTestLaptopClient(t, serverAddr)
 	req := &pb.SearchLaptopRequest{
 		Filter: filter,
@@ -107,9 +112,85 @@ func TestLaptopClient_SearchLaptop(t *testing.T) {
 	require.Equal(t, len(expectedIDs), count)
 }
 
+func TestLaptopClient_UploadImage(t *testing.T) {
+	t.Parallel()
+
+	testImageFolder := "../tmp" //测试图片存储文件夹
+
+	//新建存储器
+	laptopStore := NewInMemoryLaptopStore()
+	imageStore := NewDiskImageStore(testImageFolder)
+
+	//存储一个laptop
+	laptop := sample.NewLaptop()
+	err := laptopStore.Save(laptop)
+	require.NoError(t, err)
+
+	//开启服务器和客户端
+	serverAddr := startTestLaptopServer(t, laptopStore, imageStore)
+	laptopClient := newTestLaptopClient(t, serverAddr)
+
+	imagePath := fmt.Sprintf("%s/laptop.png", testImageFolder)
+	file, err := os.Open(imagePath)
+	require.NoError(t, err)
+	defer file.Close()
+
+	stream, err := laptopClient.UploadImage(context.Background())
+	require.NoError(t, err)
+
+	imageExt := filepath.Ext(imagePath)
+	//第一次发送图片信息
+	req := &pb.UploadImageRequest{
+		Data: &pb.UploadImageRequest_Info{
+			Info: &pb.ImageInfo{
+				LaptopId:  laptop.GetId(),
+				ImageType: imageExt,
+			},
+		},
+	}
+	err = stream.Send(req)
+	require.NoError(t, err)
+
+	//之后发送图片chunk data
+	reader := bufio.NewReader(file)
+	buffer := make([]byte, 1024)
+	size := 0
+	for {
+		//n表示本次一共读取了n个字节到buffer中
+		n, err := reader.Read(buffer)
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		req := &pb.UploadImageRequest{
+			Data: &pb.UploadImageRequest_ChunkData{
+				//最后一次不一定会读满1024个字节，此处必须取[:n]
+				ChunkData: buffer[:n],
+			},
+		}
+		err = stream.Send(req)
+		require.NoError(t, err)
+		size += n
+	}
+
+	//最后结束流，并接收服务端响应数据
+	res, err := stream.CloseAndRecv()
+	require.NoError(t, err)
+	require.NotEmpty(t, res.GetId())
+	//qual必须二者类型和值都相等，才符合;EqualValues，值相等即符合;
+	require.EqualValues(t, size, res.GetSize())
+
+	targetImagePath := fmt.Sprintf("%s/%s%s", testImageFolder, res.GetId(), imageExt)
+	require.FileExists(t, targetImagePath)
+
+	//删除测试图片
+	err = os.Remove(targetImagePath)
+	require.NoError(t, err)
+}
+
 // startTestLaptopServer 启动一个测试的grpc服务器
-func startTestLaptopServer(t *testing.T, store LaptopStore) (*LaptopServer, string) {
-	laptopServer := NewLaptopServer(store)
+func startTestLaptopServer(t *testing.T, laptopStore LaptopStore, imageStore ImageStore) string {
+	laptopServer := NewLaptopServer(laptopStore, imageStore)
 	grpcServer := grpc.NewServer()
 	pb.RegisterLaptopServiceServer(grpcServer, laptopServer)
 	listener, err := net.Listen("tcp", ":0") //随机监听一个可用的端口
@@ -117,7 +198,7 @@ func startTestLaptopServer(t *testing.T, store LaptopStore) (*LaptopServer, stri
 
 	//独立协程启动server
 	go grpcServer.Serve(listener)
-	return laptopServer, listener.Addr().String()
+	return listener.Addr().String()
 }
 
 // newTestLaptopClient 创建一个客户端
