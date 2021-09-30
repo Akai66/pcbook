@@ -21,7 +21,7 @@ func TestLaptopClient_CreateLaptop(t *testing.T) {
 	t.Parallel()
 
 	laptopStore := NewInMemoryLaptopStore()
-	serverAddr := startTestLaptopServer(t, laptopStore, nil)
+	serverAddr := startTestLaptopServer(t, laptopStore, nil, nil)
 	laptopClient := newTestLaptopClient(t, serverAddr)
 
 	laptop := sample.NewLaptop()
@@ -88,7 +88,7 @@ func TestLaptopClient_SearchLaptop(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	serverAddr := startTestLaptopServer(t, laptopStore, nil)
+	serverAddr := startTestLaptopServer(t, laptopStore, nil, nil)
 	laptopClient := newTestLaptopClient(t, serverAddr)
 	req := &pb.SearchLaptopRequest{
 		Filter: filter,
@@ -127,7 +127,7 @@ func TestLaptopClient_UploadImage(t *testing.T) {
 	require.NoError(t, err)
 
 	//开启服务器和客户端
-	serverAddr := startTestLaptopServer(t, laptopStore, imageStore)
+	serverAddr := startTestLaptopServer(t, laptopStore, imageStore, nil)
 	laptopClient := newTestLaptopClient(t, serverAddr)
 
 	imagePath := fmt.Sprintf("%s/laptop.png", testImageFolder)
@@ -188,9 +188,54 @@ func TestLaptopClient_UploadImage(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestLaptopClient_RateLaptop(t *testing.T) {
+	t.Parallel()
+
+	//新建存储器
+	laptopStore := NewInMemoryLaptopStore()
+	rateStore := NewInMemoryRateStore()
+
+	//存储一个laptop
+	laptop := sample.NewLaptop()
+	err := laptopStore.Save(laptop)
+	require.NoError(t, err)
+
+	//开启服务器和客户端
+	serverAddr := startTestLaptopServer(t, laptopStore, nil, rateStore)
+	laptopClient := newTestLaptopClient(t, serverAddr)
+
+	stream, err := laptopClient.RateLaptop(context.Background())
+	require.NoError(t, err)
+
+	//三次提交的分数
+	scores := []float64{8, 7.5, 10}
+	//预期每次提交后的平均得分
+	averages := []float64{8, 7.75, 8.5}
+
+	for _, score := range scores {
+		req := &pb.RateLaptopRequest{
+			LaptopId: laptop.GetId(),
+			Score:    score,
+		}
+		err := stream.Send(req)
+		require.NoError(t, err)
+	}
+
+	for i, avg := range averages {
+		res, err := stream.Recv()
+		require.NoError(t, err)
+		require.Equal(t, laptop.GetId(), res.GetLaptopId())
+		require.EqualValues(t, i+1, res.GetRatedCount())
+		require.Equal(t, avg, res.GetAverageScore())
+	}
+
+	err = stream.CloseSend()
+	require.NoError(t, err)
+}
+
 // startTestLaptopServer 启动一个测试的grpc服务器
-func startTestLaptopServer(t *testing.T, laptopStore LaptopStore, imageStore ImageStore) string {
-	laptopServer := NewLaptopServer(laptopStore, imageStore)
+func startTestLaptopServer(t *testing.T, laptopStore LaptopStore, imageStore ImageStore, rateStore RateStore) string {
+	laptopServer := NewLaptopServer(laptopStore, imageStore, rateStore)
 	grpcServer := grpc.NewServer()
 	pb.RegisterLaptopServiceServer(grpcServer, laptopServer)
 	listener, err := net.Listen("tcp", ":0") //随机监听一个可用的端口

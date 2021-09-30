@@ -19,12 +19,14 @@ const (
 type LaptopServer struct {
 	LaptopStore LaptopStore
 	ImageStore  ImageStore
+	RateStore   RateStore
 }
 
-func NewLaptopServer(laptopStore LaptopStore, imageStore ImageStore) *LaptopServer {
+func NewLaptopServer(laptopStore LaptopStore, imageStore ImageStore, rateStore RateStore) *LaptopServer {
 	return &LaptopServer{
 		LaptopStore: laptopStore,
 		ImageStore:  imageStore,
+		RateStore:   rateStore,
 	}
 }
 
@@ -182,7 +184,65 @@ func (server *LaptopServer) UploadImage(stream pb.LaptopService_UploadImageServe
 	return nil
 }
 
-//logError 记录
+// RateLaptop 提交laptop评分
+func (server *LaptopServer) RateLaptop(stream pb.LaptopService_RateLaptopServer) error {
+	for {
+		//处理context错误
+		err := contextErr(stream.Context())
+		if err != nil {
+			return err
+		}
+
+		//接收数据
+		req, err := stream.Recv()
+
+		if err == io.EOF {
+			log.Print("no more data")
+			break
+		}
+
+		if err != nil {
+			return logError(status.Errorf(codes.Unknown, "cannot receive rate laptop request: %v", err))
+		}
+
+		laptopID := req.GetLaptopId()
+		score := req.GetScore()
+
+		log.Print("receive a rate-laptop request:", req)
+
+		//查询laptopID是否存在
+		laptop, err := server.LaptopStore.Find(laptopID)
+		if err != nil {
+			return logError(status.Errorf(codes.Internal, "cannot find laptop: %v", err))
+		}
+		if laptop == nil {
+			return logError(status.Errorf(codes.InvalidArgument, "laptop is not exist"))
+		}
+
+		//写入rate store
+		rating, err := server.RateStore.Add(laptopID, score)
+		if err != nil {
+			return logError(status.Errorf(codes.Internal, "cannot add rate to store: %v", err))
+		}
+
+		//构造响应
+		res := &pb.RateLaptopResponse{
+			LaptopId:     laptopID,
+			RatedCount:   rating.Count,
+			AverageScore: rating.Sum / float64(rating.Count),
+		}
+
+		err = stream.Send(res)
+		if err != nil {
+			return logError(status.Errorf(codes.Unknown, "cannot send response: %v", err))
+		}
+		log.Print("send a rate-laptop response:", res)
+	}
+
+	return nil
+}
+
+// logError 记录错误日志
 func logError(err error) error {
 	if err != nil {
 		log.Print(err)
@@ -190,6 +250,7 @@ func logError(err error) error {
 	return err
 }
 
+// contextErr 处理context错误
 func contextErr(ctx context.Context) error {
 	switch ctx.Err() {
 	case context.Canceled:

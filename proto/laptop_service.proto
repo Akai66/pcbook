@@ -45,10 +45,24 @@ message UploadImageResponse{
   uint32 size = 2; //图片大小
 }
 
+//笔记本评分的请求
+message RateLaptopRequest {
+  string laptop_id = 1; //笔记本电脑id
+  double score = 2; //用户提交的该笔记本的评分
+}
+
+//笔记本评分的响应
+message RateLaptopResponse {
+  string laptop_id = 1; //笔记本电脑id
+  uint32 rated_count = 2; //被评分的次数
+  double average_score = 3; //平均评分
+}
+
 
 
 service LaptopService{
   rpc CreateLaptop(CreateLaptopRequest) returns (CreateLaptopResponse) {};
   rpc SearchLaptop(SearchLaptopRequest) returns (stream SearchLaptopResponse) {};
   rpc UploadImage(stream UploadImageRequest) returns (UploadImageResponse) {};
+  rpc RateLaptop(stream RateLaptopRequest) returns (stream RateLaptopResponse) {};
 }

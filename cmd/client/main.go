@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"flag"
+	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"pcbook/pb"
 	"pcbook/sample"
+	"strings"
 	"time"
 )
 
@@ -26,7 +28,8 @@ func main() {
 		log.Fatalf("cannot dial server: %v", err)
 	}
 	laptopClient := pb.NewLaptopServiceClient(conn)
-	testUploadImage(laptopClient)
+	//testUploadImage(laptopClient)
+	testRateLaptop(laptopClient)
 }
 
 func testCreateLaptop(laptopClient pb.LaptopServiceClient) {
@@ -56,6 +59,32 @@ func testUploadImage(laptopClient pb.LaptopServiceClient) {
 	uploadImage(laptopClient, laptop.Id, "tmp/laptop.png")
 }
 
+func testRateLaptop(laptopClient pb.LaptopServiceClient) {
+	count := 3
+	laptopIDs := make([]string, count)
+	scores := make([]float64, count)
+	for i := 0; i < count; i++ {
+		laptop := sample.NewLaptop()
+		createLaptop(laptopClient, laptop)
+		laptopIDs[i] = laptop.Id
+	}
+
+	//用户循环确认是否随机提交评分
+	for {
+		fmt.Print("rate laptop (y/n)?")
+		var answer string
+		fmt.Scan(&answer)
+		if strings.ToLower(answer) != "y" {
+			break
+		}
+		for i := 0; i < count; i++ {
+			scores[i] = sample.RandomLaptopScore()
+		}
+		rateLaptop(laptopClient, laptopIDs, scores)
+	}
+
+}
+
 func createLaptop(laptopClient pb.LaptopServiceClient, laptop *pb.Laptop) {
 	req := &pb.CreateLaptopRequest{
 		Laptop: laptop,
@@ -79,6 +108,7 @@ func createLaptop(laptopClient pb.LaptopServiceClient, laptop *pb.Laptop) {
 	log.Printf("created laptop with id: %s", res.Id)
 }
 
+// searchLaptop 服务端流模式，根据条件筛选符合要求的laptop
 func searchLaptop(laptopClient pb.LaptopServiceClient, filter *pb.Filter) {
 	log.Printf("search filter: %v", filter)
 
@@ -113,6 +143,7 @@ func searchLaptop(laptopClient pb.LaptopServiceClient, filter *pb.Filter) {
 	}
 }
 
+// uploadImage 客户端流模式，分chunk上传图片
 func uploadImage(laptopClient pb.LaptopServiceClient, laptopID, imagePath string) {
 	file, err := os.Open(imagePath)
 	if err != nil {
@@ -178,4 +209,55 @@ func uploadImage(laptopClient pb.LaptopServiceClient, laptopID, imagePath string
 	}
 
 	log.Printf("image uploaded with id: %s, size: %d", res.GetId(), res.GetSize())
+}
+
+// rateLaptop 双向流模式，提交laptop的评分
+func rateLaptop(laptopClient pb.LaptopServiceClient, laptopIDs []string, scores []float64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream, err := laptopClient.RateLaptop(ctx)
+	if err != nil {
+		log.Fatal("cannot rate laptop:", err)
+	}
+
+	//单独起一个go程接收并处理响应
+	waitResponse := make(chan error)
+	go func() {
+		for {
+			res, err := stream.Recv()
+			if err == io.EOF {
+				waitResponse <- nil
+				return
+			}
+			if err != nil {
+				waitResponse <- err
+				return
+			}
+			log.Print("receive res:", res)
+		}
+	}()
+
+	//发送请求
+	for i, laptopID := range laptopIDs {
+		req := &pb.RateLaptopRequest{
+			LaptopId: laptopID,
+			Score:    scores[i],
+		}
+		err := stream.Send(req)
+		if err != nil {
+			log.Fatal("cannot send rate request:", err, stream.RecvMsg(nil))
+		}
+		log.Print("send req:", req)
+	}
+
+	err = stream.CloseSend()
+	if err != nil {
+		log.Fatal("close stream failed:", err)
+	}
+
+	err = <-waitResponse
+	if err != nil {
+		log.Fatal("receive response failed:", err)
+	}
 }
