@@ -12,3 +12,5 @@ client:
 
 test:
 	go test -cover -race ./...
+
+.PHONY: gen clean server client test   #防止命令和项目中文件夹重名,无法执行
