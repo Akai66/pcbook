@@ -4,6 +4,11 @@ gen:
 clean:
 	rm pb/*.go
 
+server1:
+	go run cmd/server/main.go -port 50051
+server2:
+	go run cmd/server/main.go -port 50052
+
 server:
 	go run cmd/server/main.go -port 8080
 

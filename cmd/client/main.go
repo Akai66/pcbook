@@ -57,17 +57,23 @@ func loadTLSCredentials() (credentials.TransportCredentials, error) {
 
 func main() {
 	serverAddr := flag.String("address", "", "rpc server address")
+	enableTLS := flag.Bool("tls", false, "enable SSL/TLS")
 	flag.Parse()
-	log.Printf("dial server %s", *serverAddr)
+	log.Printf("dial server %s, TLS = %t", *serverAddr, *enableTLS)
 
-	//加载证书
-	creds, err := loadTLSCredentials()
-	if err != nil {
-		log.Fatalf("cannot load TLSCredentials: %v", err)
+	transportOption := grpc.WithInsecure()
+
+	if *enableTLS {
+		//加载证书
+		creds, err := loadTLSCredentials()
+		if err != nil {
+			log.Fatalf("cannot load TLSCredentials: %v", err)
+		}
+		transportOption = grpc.WithTransportCredentials(creds)
 	}
 
 	//先创建auth客户端连接，用于获取token
-	conn1, err := grpc.Dial(*serverAddr, grpc.WithTransportCredentials(creds))
+	conn1, err := grpc.Dial(*serverAddr, transportOption)
 	if err != nil {
 		log.Fatalf("cannot dial server: %v", err)
 	}
@@ -83,7 +89,7 @@ func main() {
 	//最后创建laptop客户端连接，并绑定客户端拦截器方法，客户端每次执行rpc调用时，会先调用拦截器方法，在拦截器方法中将最新的token添加到context中
 	conn2, err := grpc.Dial(
 		*serverAddr,
-		grpc.WithTransportCredentials(creds),
+		transportOption,
 		grpc.WithUnaryInterceptor(interceptor.Unary()),
 		grpc.WithStreamInterceptor(interceptor.Stream()),
 	)
