@@ -15,6 +15,10 @@ server:
 client:
 	go run cmd/client/main.go -address 0.0.0.0:8080
 
+client-tls:
+	go run cmd/client/main.go -address 0.0.0.0:8080 -tls
+
+
 test:
 	go test -cover -race ./...
 
