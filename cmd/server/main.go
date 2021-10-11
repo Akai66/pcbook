@@ -1,9 +1,13 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"io/ioutil"
 	"log"
 	"net"
 	"pcbook/pb"
@@ -26,7 +30,7 @@ func accessibleRoles() map[string][]string {
 	}
 }
 
-// seedUsers 生成管理员及普通用户
+// seedUsers 模拟生成管理员及普通用户
 func seedUsers(userStore service.UserStore) error {
 	err := createUser(userStore, "admin1", "secret", "admin")
 	if err != nil {
@@ -35,12 +39,36 @@ func seedUsers(userStore service.UserStore) error {
 	return createUser(userStore, "user1", "secret", "user")
 }
 
+// createUser 新建user并保存至userStore
 func createUser(userStore service.UserStore, username, password, role string) error {
 	user, err := service.NewUser(username, password, role)
 	if err != nil {
 		return err
 	}
 	return userStore.Save(user)
+}
+
+// loadTLSCredentials 加载服务端证书，私钥，以及ca根证书
+func loadTLSCredentials() (credentials.TransportCredentials, error) {
+	//加载服务端证书
+	cert, err := tls.LoadX509KeyPair("cert/server.pem", "cert/server.key")
+	if err != nil {
+		return nil, err
+	}
+	//加载ca证书，双向验证，服务端ca证书主要用来验证客户端证书是否合法
+	certPool := x509.NewCertPool()
+	ca, err := ioutil.ReadFile("cert/ca.pem")
+	if err != nil {
+		return nil, err
+	}
+	certPool.AppendCertsFromPEM(ca)
+
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert}, //服务端证书
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    certPool,
+	})
+	return creds, nil
 }
 
 func main() {
@@ -64,7 +92,14 @@ func main() {
 	//生成拦截器
 	interceptor := service.NewAuthInterceptor(jwtManager, accessibleRoles())
 
+	//加载TLS证书
+	creds, err := loadTLSCredentials()
+	if err != nil {
+		log.Fatalf("cannot load TLSCredentials: %v", err)
+	}
+
 	grpcServer := grpc.NewServer(
+		grpc.Creds(creds),
 		grpc.UnaryInterceptor(interceptor.Unary()),   //添加普通模式拦截器
 		grpc.StreamInterceptor(interceptor.Stream()), //添加流模式拦截器
 	)

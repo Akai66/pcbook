@@ -1,9 +1,13 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"io/ioutil"
 	"log"
 	"pcbook/client"
 	"pcbook/pb"
@@ -28,13 +32,42 @@ func authMethods() map[string]bool {
 	}
 }
 
+// loadTLSCredentials 加载客户端证书，私钥，以及ca根证书
+func loadTLSCredentials() (credentials.TransportCredentials, error) {
+	//加载客户端证书
+	cert, err := tls.LoadX509KeyPair("cert/client.pem", "cert/client.key")
+	if err != nil {
+		return nil, err
+	}
+	//加载ca证书，双向验证，客户端ca证书主要用来验证服务端证书是否合法
+	certPool := x509.NewCertPool()
+	ca, err := ioutil.ReadFile("cert/ca.pem")
+	if err != nil {
+		return nil, err
+	}
+	certPool.AppendCertsFromPEM(ca)
+
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ServerName:   "localhost",
+		RootCAs:      certPool,
+	})
+	return creds, nil
+}
+
 func main() {
 	serverAddr := flag.String("address", "", "rpc server address")
 	flag.Parse()
 	log.Printf("dial server %s", *serverAddr)
 
+	//加载证书
+	creds, err := loadTLSCredentials()
+	if err != nil {
+		log.Fatalf("cannot load TLSCredentials: %v", err)
+	}
+
 	//先创建auth客户端连接，用于获取token
-	conn1, err := grpc.Dial(*serverAddr, grpc.WithInsecure())
+	conn1, err := grpc.Dial(*serverAddr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Fatalf("cannot dial server: %v", err)
 	}
@@ -50,7 +83,7 @@ func main() {
 	//最后创建laptop客户端连接，并绑定客户端拦截器方法，客户端每次执行rpc调用时，会先调用拦截器方法，在拦截器方法中将最新的token添加到context中
 	conn2, err := grpc.Dial(
 		*serverAddr,
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(creds),
 		grpc.WithUnaryInterceptor(interceptor.Unary()),
 		grpc.WithStreamInterceptor(interceptor.Stream()),
 	)
